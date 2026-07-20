@@ -3,85 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LeBron James: The GOAT</title>
+    <title>Two Pages in One File</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #111;
-            color: #fff;
-            margin: 0;
-            padding: 0;
+            font-family: Arial, sans-serif;
             text-align: center;
+            margin: 50px auto;
+            max-width: 600px;
+            background-color: #f4f4f9;
+            color: #333;
         }
-        header {
-            background: linear-gradient(135deg, #552583, #FDB927);
-            padding: 40px 20px;
-        }
-        h1 {
-            margin: 0;
-            font-size: 3rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
-        }
-        .container {
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-        p {
-            font-size: 1.2rem;
-            line-height: 1.6;
-            color: #ccc;
-        }
-        .image-box {
-            margin: 30px 0;
-            background: #222;
-            padding: 15px;
+        .page {
+            background: white;
+            padding: 30px;
             border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        /* Hide pages by default */
+        .hidden {
+            display: none;
         }
         img {
             max-width: 100%;
             height: auto;
-            border-radius: 4px;
+            border-radius: 6px;
+            margin-bottom: 20px;
         }
-        .btn {
+        a {
             display: inline-block;
-            background-color: #FDB927;
-            color: #552583;
-            padding: 15px 30px;
-            font-size: 1.1rem;
-            font-weight: bold;
+            margin-top: 15px;
+            color: #007BFF;
             text-decoration: none;
-            border-radius: 30px;
-            transition: transform 0.2s, background-color 0.2s;
-            margin-top: 20px;
+            font-weight: bold;
         }
-        .btn:hover {
-            transform: scale(1.05);
-            background-color: #ffe066;
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>LeBron James: The Greatest of All Time</h1>
-    </header>
+    <section id="page1" class="page">
+        <h2>Welcome to Page 1</h2>
+        <img src="https://carranza-demo-bucket.s3.us-east-1.amazonaws.com/Screenshot+2026-05-19+154405.png
+ " alt="A beautiful placeholder image">
+        <br>
+        <a href="#" onclick="navigateTo('page2')">Go to Page 2 &rarr;</a>
+    </section>
 
-    <div class="container">
-        <h2>Why King James Reigns Supreme</h2>
-        <p> For over two decades, LeBron James has dominated the NBA like no other player in basketball history. Combining unprecedented longevity, elite athleticism, and unparalleled basketball IQ, he has shattered records and redefined what is possible on the court.</p>
-        
-        <div class="image-box">
-            <!-- Dynamic Image Link -->
-            <img src="lebronjames.jpg" alt="LeBron James celebrating championship with trophies">
-            <p style="font-size: 0.9rem; font-style: italic; margin-top: 10px;">4x NBA Champion, 4x Finals MVP, and the ultimate winner.</p>
-        </div>
+    <section id="page2" class="page hidden">
+        <h2>Welcome to Page 2</h2>
+        <p>This is the second page inside the exact same HTML file!</p>
+        <a href="#" onclick="navigateTo('page1')">&larr; Back to Page 1</a>
+    </section>
 
-        <p>From his iconic chase-down block in the 2016 Finals to winning championships with three different franchises, LeBron's resume speaks for itself. He isn't just in the conversation—he defines it.</p>
-
-        <a href="stats.html" class="btn">View the Legendary Stats &rarr;</a>
-    </div>
+    <script>
+        // Simple function to switch between pages
+        function navigateTo(pageId) {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.add('hidden');
+            });
+            // Show the selected page
+            document.getElementById(pageId).classList.remove('hidden');
+        }
+    </script>
 
 </body>
 </html>
