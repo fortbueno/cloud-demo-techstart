@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two Pages in One File</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px auto;
+            max-width: 600px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .page {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        /* Hide pages by default */
+        .hidden {
+            display: none;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        a {
+            display: inline-block;
+            margin-top: 15px;
+            color: #007BFF;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <section id="page1" class="page">
+        <h2>Welcome to Page 1</h2>
+        <img src="https://carranza-demo-bucket.s3.us-east-1.amazonaws.com/Screenshot+2026-05-19+154405.png
+ " alt="A beautiful placeholder image">
+        <br>
+        <a href="#" onclick="navigateTo('page2')">Go to Page 2 &rarr;</a>
+    </section>
+
+    <section id="page2" class="page hidden">
+        <h2>Welcome to Page 2</h2>
+        <p>This is the second page inside the exact same HTML file!</p>
+        <a href="#" onclick="navigateTo('page1')">&larr; Back to Page 1</a>
+    </section>
+
+    <script>
+        // Simple function to switch between pages
+        function navigateTo(pageId) {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.add('hidden');
+            });
+            // Show the selected page
+            document.getElementById(pageId).classList.remove('hidden');
+        }
+    </script>
+
+</body>
+</html>
