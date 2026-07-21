@@ -3,176 +3,128 @@ pipeline {
     agent any
 
     environment {
-
-        // Azure
-        RESOURCE_GROUP = "rg-azuser7670_mml.local-e10FL"
-        FILE_SHARE = "webcontent"
+        // Azure Storage
         STORAGE_ACCOUNT = "fqbuenostg"
+        FILE_SHARE = "webcontent"
 
-        ACI_URL = "fqbuenolabel.centralindia.azurecontainer.io"
+        // Staging (ACI)
+        ACI_URL = "http://fqbuenolabel.centralindia.azurecontainer.io"
 
-        // Production EC2 servers
-        WEB1 = "ubuntu@10.0.10.99"
-        WEB2 = "ubuntu@10.0.11.115"
+        // Production EC2 Private IPs
+        WEB1 = "10.0.10.99"
+        WEB2 = "10.0.11.115"
 
         REMOTE_DIR = "/var/www/html"
-
     }
 
     stages {
 
         stage('Checkout') {
-
             steps {
-
                 checkout scm
-
-            }
-        }
-
-        stage('Azure Login') {
-
-            steps {
-
-                withCredentials([
-                    string(credentialsId: 'azure-storage-key', variable: 'STORAGE_KEY'),
-                ]) {
-                    sh '''
-                    az storage file upload-batch \
-                    --account-name $STORAGE_ACCOUNT \
-                    --account-key $STORAGE_KEY \
-                    --destination $FILE_SHARE \
-                    --source .
-                    '''
-}
             }
         }
 
         stage('Deploy to Azure Staging') {
-
             steps {
+                withCredentials([
+                    string(credentialsId: 'azure-storage-key', variable: 'STORAGE_KEY')
+                ]) {
+                    sh '''
+                        echo "Uploading files to Azure File Share..."
 
-                sh '''
-
-                echo "Uploading files to Azure File Share..."
-
-                az storage file upload-batch \
-                --account-name $STORAGE_ACCOUNT \
-                --destination $FILE_SHARE \
-                --source . \
-                --auth-mode login
-
-                '''
-
+                        az storage file upload-batch \
+                            --account-name $STORAGE_ACCOUNT \
+                            --account-key $STORAGE_KEY \
+                            --destination $FILE_SHARE \
+                            --source .
+                    '''
+                }
             }
         }
 
         stage('Wait for ACI') {
-
             steps {
-
-                sleep(time:20, unit:'SECONDS')
-
+                echo "Waiting for Azure File Share changes to be reflected..."
+                sleep(time: 20, unit: 'SECONDS')
             }
-
         }
 
         stage('HTTP Availability Test') {
-
             steps {
-
                 sh '''
+                    STATUS=$(curl -o /dev/null -s -w "%{http_code}" $ACI_URL)
 
-                STATUS=$(curl -o /dev/null -s -w "%{http_code}" $ACI_URL)
+                    if [ "$STATUS" != "200" ]; then
+                        echo "ERROR: ACI returned HTTP $STATUS"
+                        exit 1
+                    fi
 
-                if [ "$STATUS" != "200" ]; then
-
-                    echo "ACI not reachable"
-
-                    exit 1
-
-                fi
-
+                    echo "ACI is reachable."
                 '''
-
             }
-
         }
 
         stage('Content Assertion') {
-
             steps {
-
                 sh '''
+                    PAGE=$(curl -s $ACI_URL)
 
-                PAGE=$(curl -s $ACI_URL)
+                    echo "$PAGE"
 
-                echo "$PAGE"
+                    # Change "Welcome" to text that exists on your homepage
+                    echo "$PAGE" | grep -q "Welcome"
 
+                    echo "Content validation passed."
                 '''
-
             }
-
         }
 
-        stage('Deploy Production') {
-
+        stage('Deploy to Production') {
             steps {
-
                 sshagent(['ec2-ssh-key']) {
-
                     sh '''
+                        echo "Deploying to Web Server 1..."
 
-                    rsync -avz --delete \
-                        --exclude='.git' \
-                        -e "ssh -o StrictHostKeyChecking=no" \
-                        ./ ubuntu@$WEB1:$REMOTE_DIR
+                        rsync -avz --delete \
+                            --exclude='.git' \
+                            -e "ssh -o StrictHostKeyChecking=no" \
+                            ./ ubuntu@$WEB1:$REMOTE_DIR/
 
-                    ssh -o StrictHostKeyChecking=no ubuntu@$WEB1 <<EOF
+                        ssh -o StrictHostKeyChecking=no ubuntu@$WEB1 "
+                            sudo chown -R www-data:www-data $REMOTE_DIR &&
+                            sudo systemctl restart apache2
+                        "
 
-                        sudo chown -R www-data:www-data $REMOTE_DIR
+                        echo "Deploying to Web Server 2..."
 
-                        sudo systemctl restart apache2
+                        rsync -avz --delete \
+                            --exclude='.git' \
+                            -e "ssh -o StrictHostKeyChecking=no" \
+                            ./ ubuntu@$WEB2:$REMOTE_DIR/
 
-EOF
-
-                    rsync -avz --delete \
-                        --exclude='.git' \
-                        -e "ssh -o StrictHostKeyChecking=no" \
-                        ./ ubuntu@$WEB2:$REMOTE_DIR
-
-                    ssh -o StrictHostKeyChecking=no ubuntu@$WEB2 <<EOF
-
-                        sudo chown -R www-data:www-data $REMOTE_DIR
-
-                        sudo systemctl restart apache2
-
-EOF
-
+                        ssh -o StrictHostKeyChecking=no ubuntu@$WEB2 "
+                            sudo chown -R www-data:www-data $REMOTE_DIR &&
+                            sudo systemctl restart apache2
+                        "
                     '''
-
                 }
-
             }
-
         }
-
     }
 
     post {
 
         success {
-
-            echo "Deployment Successful"
-
+            echo "Pipeline completed successfully."
         }
 
         failure {
-
-            echo "Deployment Failed"
-
+            echo "Pipeline failed. Production deployment was skipped."
         }
 
+        always {
+            cleanWs()
+        }
     }
-
 }
