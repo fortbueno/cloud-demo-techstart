@@ -87,7 +87,9 @@ pipeline {
                         echo "Deploying to Web Server 1..."
 
                         rsync -avz --delete \
+                            --rsync-path="sudo rsync" \
                             --exclude='.git' \
+                            --exclude='Jenkinsfile' \
                             -e "ssh -o StrictHostKeyChecking=no" \
                             ./ ubuntu@$WEB1:$REMOTE_DIR/
 
@@ -99,7 +101,9 @@ pipeline {
                         echo "Deploying to Web Server 2..."
 
                         rsync -avz --delete \
+                            --rsync-path="sudo rsync" \
                             --exclude='.git' \
+                            --exclude='Jenkinsfile' \
                             -e "ssh -o StrictHostKeyChecking=no" \
                             ./ ubuntu@$WEB2:$REMOTE_DIR/
 
