@@ -60,7 +60,6 @@ pipeline {
                 --account-name $STORAGE_ACCOUNT \
                 --destination $FILE_SHARE \
                 --source . \
-                --overwrite \
                 --auth-mode login
 
                 '''
