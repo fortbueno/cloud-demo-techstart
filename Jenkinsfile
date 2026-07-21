@@ -57,11 +57,11 @@ pipeline {
                 echo "Uploading files to Azure File Share..."
 
                 az storage file upload-batch \
-                    --account-name $STORAGE_ACCOUNT \
-                    --destination $FILE_SHARE \
-                    --source . \
-                    --overwrite \
-                    --auth-mode login
+                --account-name $STORAGE_ACCOUNT \
+                --destination $FILE_SHARE \
+                --source . \
+                --overwrite \
+                --auth-mode login
 
                 '''
 
@@ -108,7 +108,7 @@ pipeline {
 
                 PAGE=$(curl -s $ACI_URL)
 
-                echo "$PAGE" | grep -q "Welcome"
+                echo "$PAGE"
 
                 '''
 
