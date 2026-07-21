@@ -1,132 +1,158 @@
 pipeline {
     agent any
 
-    options {
-        timestamps()
-        disableConcurrentBuilds()
-    }
-
     environment {
-        // ---------- Azure ----------
-        AZURE_STORAGE_ACCOUNT = 'fqbuenostg'
-        AZURE_FILE_SHARE      = 'webcontent'
-        ACI_URL               = 'http://20.204.214.142'
 
-        // ---------- AWS Production ----------
-        SERVERS = 'ubuntu@10.0.10.99 ubuntu@10.0.11.115'
-        DOCROOT = '/var/www/html'
+        // Azure
+        AZURE_VM = "fqbueno@4.224.63.150"
+        AZURE_SHARE = "/mnt/aci-share"
 
-        // ---------- Application ----------
-        APP_SRC = '.'
+        // AWS Production Servers
+        WEB1 = "ubuntu@10.0.10.99"
+        WEB2 = "ubuntu@10.0.11.115"
+
+        // ACI Endpoint
+        STAGING_URL = "fqbuenolabel.centralindia.azurecontainer.io"
+
+        // Content expected from homepage
+        EXPECTED_TEXT = "Milestone Project"
+
+        // Jenkins SSH Credential ID
+        SSH_CREDENTIAL = "az-key"
+        AWS_CREDENTIAL = "webserver-key"
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                checkout scm
+                git branch: 'main',
+                    url: 'https://github.com/fortbueno/cloud-demo-techstart.git'
             }
         }
 
         stage('Build') {
             steps {
+                echo "Preparing application..."
+
                 sh '''
-                    echo "Building application..."
+                mkdir -p app_src
 
-                    # Example builds:
-                    # npm install
-                    # npm test
-                    # npm run build
-
-                    echo "No build required."
+                rsync -av \
+                    --exclude=.git \
+                    --exclude=.github \
+                    --exclude=Jenkinsfile \
+                    ./ app_src/
                 '''
             }
         }
 
-        stage('Deploy to Staging (Azure ACI)') {
-            steps {
-                sh '''
-                    echo "Uploading application to Azure File Share..."
-
-                    az storage file upload-batch \
-                        --account-name $AZURE_STORAGE_ACCOUNT \
-                        --destination $AZURE_FILE_SHARE \
-                        --source $APP_SRC \
-                        --overwrite true \
-                        --auth-mode login
-                '''
-            }
-        }
-
-        stage('Test Staging') {
-            steps {
-                sh '''
-                    echo "Waiting for ACI..."
-                    sleep 20
-
-                    echo "Checking HTTP status..."
-
-                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" $ACI_URL)
-
-                    if [ "$STATUS" != "200" ]; then
-                        echo "Expected HTTP 200 but got $STATUS"
-                        exit 1
-                    fi
-
-                    echo "Checking page contents..."
-
-                    curl -fs $ACI_URL | grep -q "Welcome to Cloud Demo"
-
-                    echo "Staging validation passed."
-                '''
-            }
-        }
-
-        stage('Deploy to Production') {
+        stage('Deploy to Azure Staging') {
             steps {
 
-                sshagent(credentials: ['webserver-key']) {
+                sshagent(credentials: [SSH_CREDENTIAL]) {
 
-                    sh '''
-                        set -e
+                    sh """
 
-                        SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+                    echo "Deploying to Azure VM..."
 
-                        for HOST in $SERVERS
-                        do
-                            echo "Deploying to $HOST"
+                    rsync -avz \
+                        -e "ssh -o StrictHostKeyChecking=no" \
+                        app_src/ \
+                        ${AZURE_VM}:${AZURE_SHARE}/
 
-                            rsync -az --delete \
-                                -e "ssh $SSH_OPTS" \
-                                --rsync-path="sudo rsync" \
-                                --exclude '.git' \
-                                --exclude 'Jenkinsfile' \
-                                "$APP_SRC/" \
-                                "$HOST:$DOCROOT/"
+                    """
 
-                            ssh $SSH_OPTS $HOST \
-                                "sudo systemctl reload apache2"
-
-                            echo "$HOST deployment completed."
-                        done
-                    '''
                 }
             }
         }
+
+        stage('Staging Validation') {
+
+            steps {
+
+                script {
+
+                    retry(10) {
+
+                        sleep(time: 10, unit: 'SECONDS')
+
+                        sh """
+
+                        echo "Checking HTTP..."
+
+                        curl --fail ${STAGING_URL}
+
+                        """
+
+                    }
+
+                    sh """
+
+                    echo "Checking page contents..."
+
+                    curl -s ${STAGING_URL}
+
+                    """
+
+                }
+
+            }
+
+        }
+
+        stage('Deploy Production') {
+
+            steps {
+
+                sshagent(credentials: [SSH_CREDENTIAL]) {
+
+                    sh """
+
+                    echo "Deploying Web Server 1..."
+
+                    rsync -avz \
+                      -e "ssh -o StrictHostKeyChecking=no" \
+                      app_src/ \
+                      ${WEB1}:/var/www/html/
+
+                    ssh -o StrictHostKeyChecking=no ${WEB1} \
+                      "sudo systemctl restart httpd"
+
+                    """
+
+                    sh """
+
+                    echo "Deploying Web Server 2..."
+
+                    rsync -avz \
+                      -e "ssh -o StrictHostKeyChecking=no" \
+                      app_src/ \
+                      ${WEB2}:/var/www/html/
+
+                    ssh -o StrictHostKeyChecking=no ${WEB2} \
+                      "sudo systemctl restart httpd"
+
+                    """
+
+                }
+
+            }
+
+        }
+
     }
 
     post {
 
         success {
-            echo 'Pipeline completed successfully.'
+            echo "Deployment Successful!"
         }
 
         failure {
-            echo 'Pipeline failed. Production deployment was skipped.'
+            echo "Pipeline Failed."
+            echo "Production deployment was NOT executed."
         }
 
-        always {
-            cleanWs()
-        }
     }
 }
