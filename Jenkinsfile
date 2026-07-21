@@ -1,101 +1,116 @@
 pipeline {
+
     agent any
 
     environment {
 
         // Azure
-        AZURE_VM = "fqbueno@4.224.63.150"
-        AZURE_SHARE = "/mnt/aci-share"
+        RESOURCE_GROUP = "rg-azuser7670_mml.local-e10FL"
+        FILE_SHARE = "fqbuenolabel.centralindia.azurecontainer.io"
 
-        // AWS Production Servers
+        ACI_URL = ""
+
+        // Production EC2 servers
         WEB1 = "ubuntu@10.0.10.99"
         WEB2 = "ubuntu@10.0.11.115"
 
-        // ACI Endpoint
-        STAGING_URL = "fqbuenolabel.centralindia.azurecontainer.io"
+        REMOTE_DIR = "/var/www/html"
 
-        // Content expected from homepage
-        EXPECTED_TEXT = "Milestone Project"
-
-        // Jenkins SSH Credential ID
-        SSH_CREDENTIAL = "az-key"
-        AWS_CREDENTIAL = "webserver-key"
     }
 
     stages {
 
         stage('Checkout') {
+
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/fortbueno/cloud-demo-techstart.git'
+
+                checkout scm
+
             }
         }
 
-        stage('Build') {
+        stage('Azure Login') {
+
             steps {
-                echo "Preparing application..."
 
-                sh '''
-                mkdir -p app_src
-
-                rsync -av \
-                    --exclude=.git \
-                    --exclude=.github \
-                    --exclude=Jenkinsfile \
-                    ./ app_src/
-                '''
+                withCredentials([
+                    string(credentialsId: 'azure-storage-account', variable: 'STORAGE_ACCOUNT'),
+                    string(credentialsId: 'azure-storage-key', variable: 'STORAGE_KEY')
+                ]) {
+                    sh '''
+                    az storage file upload-batch \
+                    --account-name $STORAGE_ACCOUNT \
+                    --account-key $STORAGE_KEY \
+                    --destination $FILE_SHARE \
+                    --source .
+                    '''
+}
             }
         }
 
         stage('Deploy to Azure Staging') {
+
             steps {
 
-                sshagent(credentials: [SSH_CREDENTIAL]) {
+                sh '''
 
-                    sh """
+                echo "Uploading files to Azure File Share..."
 
-                    echo "Deploying to Azure VM..."
+                az storage file upload-batch \
+                    --account-name $STORAGE_ACCOUNT \
+                    --destination $FILE_SHARE \
+                    --source . \
+                    --overwrite \
+                    --auth-mode login
 
-                    rsync -avz \
-                        -e "ssh -o StrictHostKeyChecking=no" \
-                        app_src/ \
-                        ${AZURE_VM}:${AZURE_SHARE}/
+                '''
 
-                    """
-
-                }
             }
         }
 
-        stage('Staging Validation') {
+        stage('Wait for ACI') {
 
             steps {
 
-                script {
+                sleep(time:20, unit:'SECONDS')
 
-                    retry(10) {
+            }
 
-                        sleep(time: 10, unit: 'SECONDS')
+        }
 
-                        sh """
+        stage('HTTP Availability Test') {
 
-                        echo "Checking HTTP..."
+            steps {
 
-                        curl --fail ${STAGING_URL}
+                sh '''
 
-                        """
+                STATUS=$(curl -o /dev/null -s -w "%{http_code}" $ACI_URL)
 
-                    }
+                if [ "$STATUS" != "200" ]; then
 
-                    sh """
+                    echo "ACI not reachable"
 
-                    echo "Checking page contents..."
+                    exit 1
 
-                    curl -s ${STAGING_URL}
+                fi
 
-                    """
+                '''
 
-                }
+            }
+
+        }
+
+        stage('Content Assertion') {
+
+            steps {
+
+                sh '''
+
+                PAGE=$(curl -s $ACI_URL)
+
+                echo "$PAGE" | grep -q "Welcome"
+
+                '''
 
             }
 
@@ -105,35 +120,37 @@ pipeline {
 
             steps {
 
-                sshagent(credentials: [SSH_CREDENTIAL]) {
+                sshagent(['ec2-ssh-key']) {
 
-                    sh """
+                    sh '''
 
-                    echo "Deploying Web Server 1..."
+                    rsync -avz --delete \
+                        --exclude='.git' \
+                        -e "ssh -o StrictHostKeyChecking=no" \
+                        ./ ubuntu@$WEB1:$REMOTE_DIR
 
-                    rsync -avz \
-                      -e "ssh -o StrictHostKeyChecking=no" \
-                      app_src/ \
-                      ${WEB1}:/var/www/html/
+                    ssh -o StrictHostKeyChecking=no ubuntu@$WEB1 <<EOF
 
-                    ssh -o StrictHostKeyChecking=no ${WEB1} \
-                      "sudo systemctl restart httpd"
+                        sudo chown -R www-data:www-data $REMOTE_DIR
 
-                    """
+                        sudo systemctl restart apache2
 
-                    sh """
+EOF
 
-                    echo "Deploying Web Server 2..."
+                    rsync -avz --delete \
+                        --exclude='.git' \
+                        -e "ssh -o StrictHostKeyChecking=no" \
+                        ./ ubuntu@$WEB2:$REMOTE_DIR
 
-                    rsync -avz \
-                      -e "ssh -o StrictHostKeyChecking=no" \
-                      app_src/ \
-                      ${WEB2}:/var/www/html/
+                    ssh -o StrictHostKeyChecking=no ubuntu@$WEB2 <<EOF
 
-                    ssh -o StrictHostKeyChecking=no ${WEB2} \
-                      "sudo systemctl restart httpd"
+                        sudo chown -R www-data:www-data $REMOTE_DIR
 
-                    """
+                        sudo systemctl restart apache2
+
+EOF
+
+                    '''
 
                 }
 
@@ -146,13 +163,17 @@ pipeline {
     post {
 
         success {
-            echo "Deployment Successful!"
+
+            echo "Deployment Successful"
+
         }
 
         failure {
-            echo "Pipeline Failed."
-            echo "Production deployment was NOT executed."
+
+            echo "Deployment Failed"
+
         }
 
     }
+
 }
