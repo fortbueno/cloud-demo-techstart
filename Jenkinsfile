@@ -6,9 +6,9 @@ pipeline {
 
         // Azure
         RESOURCE_GROUP = "rg-azuser7670_mml.local-e10FL"
-        FILE_SHARE = "fqbuenolabel.centralindia.azurecontainer.io"
+        FILE_SHARE = "webcontent"
 
-        ACI_URL = ""
+        ACI_URL = "fqbuenolabel.centralindia.azurecontainer.io"
 
         // Production EC2 servers
         WEB1 = "ubuntu@10.0.10.99"
