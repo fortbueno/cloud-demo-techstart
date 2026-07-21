@@ -73,7 +73,7 @@ pipeline {
                     echo "$PAGE"
 
                     # Change "Welcome" to text that exists on your homepage
-                    echo "$PAGE" | grep -q "Welcome"
+                    echo "$PAGE" | grep -q "LeBron James"
 
                     echo "Content validation passed."
                 '''
