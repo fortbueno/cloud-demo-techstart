@@ -7,6 +7,7 @@ pipeline {
         // Azure
         RESOURCE_GROUP = "rg-azuser7670_mml.local-e10FL"
         FILE_SHARE = "webcontent"
+        STORAGE_ACCOUNT = "fqbuenostg"
 
         ACI_URL = "fqbuenolabel.centralindia.azurecontainer.io"
 
@@ -35,7 +36,6 @@ pipeline {
 
                 withCredentials([
                     string(credentialsId: 'azure-storage-account', variable: 'STORAGE_ACCOUNT'),
-                    string(credentialsId: 'azure-storage-key', variable: 'STORAGE_KEY')
                 ]) {
                     sh '''
                     az storage file upload-batch \
