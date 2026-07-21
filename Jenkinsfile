@@ -82,7 +82,7 @@ pipeline {
 
         stage('Deploy to Production') {
             steps {
-                sshagent(['ec2-ssh-key']) {
+                sshagent(['webserver-key']) {
                     sh '''
                         echo "Deploying to Web Server 1..."
 
