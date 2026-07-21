@@ -35,7 +35,7 @@ pipeline {
             steps {
 
                 withCredentials([
-                    string(credentialsId: 'azure-storage-account', variable: 'STORAGE_ACCOUNT'),
+                    string(credentialsId: 'azure-storage-key', variable: 'STORAGE_KEY'),
                 ]) {
                     sh '''
                     az storage file upload-batch \
